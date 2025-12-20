@@ -298,31 +298,71 @@ SOFTWARE.
 
 ### Plugin Location & Main Menu
 
-| Tools Menu | ReadMastery Menu |
-|:----------:|:----------------:|
-| ![Location](screenshots/01Tools.png) | ![Menu](screenshots/02Menu.png) |
-| *Find ReadMastery under Tools* | *Main plugin menu* |
+<table>
+  <tr>
+    <th>Tools Menu</th>
+    <th>ReadMastery Menu</th>
+  </tr>
+  <tr>
+    <td><img src="screenshots/01Tools.png" width="300" alt="Tools Menu"></td>
+    <td><img src="screenshots/02menu.png" width="300" alt="ReadMastery Menu"></td>
+  </tr>
+  <tr>
+    <td><i>Find ReadMastery under Tools</i></td>
+    <td><i>Main plugin menu</i></td>
+  </tr>
+</table>
 
 ### Stats & Achievements
 
-| Stats View | Achievements |
-|:----------:|:------------:|
-| ![Stats](screenshots/03Stats.png) | ![Achievements](screenshots/04Achievements.png) |
-| *Level, XP, Streak info* | *11 unlockable badges* |
+<table>
+  <tr>
+    <th>Stats View</th>
+    <th>Achievements</th>
+  </tr>
+  <tr>
+    <td><img src="screenshots/03stats.png" width="300" alt="Stats View"></td>
+    <td><img src="screenshots/04achievements.png" width="300" alt="Achievements"></td>
+  </tr>
+  <tr>
+    <td><i>Level, XP, Streak info</i></td>
+    <td><i>11 unlockable badges</i></td>
+  </tr>
+</table>
 
 ### Analytics Features
 
-| Analytics Menu | 7-Day Heatmap |
-|:--------------:|:-------------:|
-| ![Analytics](screenshots/05Analytics.png) | ![Heatmap](screenshots/06Heatmap.png) |
-| *Unlocks as you level up* | *Visual reading intensity* |
+<table>
+  <tr>
+    <th>Analytics Menu</th>
+    <th>7-Day Heatmap</th>
+  </tr>
+  <tr>
+    <td><img src="screenshots/05analytics.png" width="300" alt="Analytics Menu"></td>
+    <td><img src="screenshots/06heatmap.png" width="300" alt="Heatmap"></td>
+  </tr>
+  <tr>
+    <td><i>Unlocks as you level up</i></td>
+    <td><i>Visual reading intensity</i></td>
+  </tr>
+</table>
 
 ### Settings & Info
 
-| Settings | About |
-|:--------:|:-----:|
-| ![Settings](screenshots/07Settings.png) | ![Info](screenshots/08Info.png) |
-| *Sandbox, Reset* | *Plugin information* |
+<table>
+  <tr>
+    <th>Settings</th>
+    <th>About</th>
+  </tr>
+  <tr>
+    <td><img src="screenshots/07settings.png" width="300" alt="Settings"></td>
+    <td><img src="screenshots/08info.png" width="300" alt="About"></td>
+  </tr>
+  <tr>
+    <td><i>Sandbox, Reset</i></td>
+    <td><i>Plugin information</i></td>
+  </tr>
+</table>
 ---
 
 <p align="center">
