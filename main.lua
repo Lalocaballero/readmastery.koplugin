@@ -22,9 +22,10 @@ local ReadMastery = WidgetContainer:extend{
     is_doc_only = false,
 }
 
+-- How long (in seconds) before we consider the user idle
+local IDLE_TIMEOUT = 120  -- 2 minutes without page turn = idle
+
 function ReadMastery:init()
-    self.path = self.path or (self.ui and self.ui.document and self.ui.document.file and self.ui.document.file:match(".*/") or "plugins/readmastery.koplugin")
-    
     self.data_dir = DataStorage:getDataDir() .. "/readmastery"
     self:ensureDataDir()
     
@@ -51,6 +52,11 @@ function ReadMastery:init()
         current_format = nil,
         last_page = nil,
         is_active = false,
+        -- NEW: Active reading tracking
+        last_page_turn_time = nil,
+        active_reading_seconds = 0,
+        continuous_pages = 0,  -- Pages without long break
+        continuous_start_time = nil,  -- When continuous reading started
     }
     
     -- Register menu
@@ -94,15 +100,21 @@ function ReadMastery:startSession()
     local file_path = self.ui.document.file
     local format = file_path:match("%.([^%.]+)$"):upper()
     
+    local now = os.time()
+    
     self.session = {
-        start_time = os.time(),
+        start_time = now,
         pages_read = 0,
         current_book = props.title or file_path:match("([^/]+)$"),
         current_format = format,
         book_path = file_path,
         last_page = self.ui.document:getCurrentPage(),
         is_active = true,
-        continuous_reading_start = os.time(),
+        -- Active reading tracking
+        last_page_turn_time = now,
+        active_reading_seconds = 0,
+        continuous_pages = 0,
+        continuous_start_time = now,
     }
     
     -- Track format for Format Explorer achievement
@@ -117,24 +129,33 @@ end
 function ReadMastery:endSession()
     if not self.session.is_active then return end
     
-    local session_duration = os.time() - self.session.start_time
-    local session_minutes = math.floor(session_duration / 60)
+    -- Calculate final active reading time
+    -- Add any remaining time since last page turn (up to IDLE_TIMEOUT)
+    local now = os.time()
+    if self.session.last_page_turn_time then
+        local time_since_last_turn = now - self.session.last_page_turn_time
+        if time_since_last_turn <= IDLE_TIMEOUT then
+            self.session.active_reading_seconds = self.session.active_reading_seconds + time_since_last_turn
+        end
+    end
     
-    -- Award time-based XP
+    local session_minutes = math.floor(self.session.active_reading_seconds / 60)
+    
+    -- Award time-based XP (only for ACTIVE reading time)
     local time_xp = self.xp_engine:calculateTimeXP(session_minutes)
     self.core:addXP(time_xp, "time")
     
     -- Update session stats
     self.core:recordSession({
-        duration = session_duration,
+        duration = self.session.active_reading_seconds,  -- Store active time, not total time
         pages = self.session.pages_read,
         book = self.session.current_book,
         format = self.session.current_format,
         date = os.date("%Y-%m-%d"),
     })
     
-    -- Check session-based achievements
-    self.achievements:checkSessionAchievements(self.session, session_duration)
+    -- Check session-based achievements with ACTIVE reading time
+    self.achievements:checkSessionAchievements(self.session, self.session.active_reading_seconds)
     
     -- Check book completion
     if self.ui.document then
@@ -155,7 +176,8 @@ function ReadMastery:endSession()
     self.core:save()
     
     self.session.is_active = false
-    logger.dbg("ReadMastery: Session ended. Pages:", self.session.pages_read, "Minutes:", session_minutes)
+    logger.dbg("ReadMastery: Session ended. Pages:", self.session.pages_read, 
+               "Active Minutes:", session_minutes)
 end
 
 -- Called on every page turn
@@ -165,10 +187,36 @@ function ReadMastery:onPageUpdate(page)
     local current_page = page or (self.ui.document and self.ui.document:getCurrentPage())
     if not current_page then return end
     
+    local now = os.time()
+    
     -- Track page turn
     if self.session.last_page and current_page ~= self.session.last_page then
         local pages_turned = math.abs(current_page - self.session.last_page)
         self.session.pages_read = self.session.pages_read + pages_turned
+        
+        -- Calculate active reading time since last page turn
+        if self.session.last_page_turn_time then
+            local time_since_last_turn = now - self.session.last_page_turn_time
+            
+            -- Only count time if within idle timeout (user was actively reading)
+            if time_since_last_turn <= IDLE_TIMEOUT then
+                self.session.active_reading_seconds = self.session.active_reading_seconds + time_since_last_turn
+                
+                -- Continue counting continuous pages
+                self.session.continuous_pages = self.session.continuous_pages + pages_turned
+            else
+                -- User was idle - reset continuous reading
+                self.session.continuous_pages = pages_turned
+                self.session.continuous_start_time = now
+            end
+        else
+            -- First page turn
+            self.session.continuous_pages = pages_turned
+            self.session.continuous_start_time = now
+        end
+        
+        -- Update last page turn time
+        self.session.last_page_turn_time = now
         
         -- Award page XP
         local page_xp = self.xp_engine:calculatePageXP(pages_turned)
@@ -187,11 +235,36 @@ function ReadMastery:onPageUpdate(page)
         -- Update daily pages for today
         self.core:addDailyPages(pages_turned)
         
-        -- Check achievements
+        -- Check achievements (pass continuous reading data)
         self.achievements:checkAllAchievements()
+        self:checkContinuousAchievements()
     end
     
     self.session.last_page = current_page
+end
+
+-- Check achievements that require continuous reading
+function ReadMastery:checkContinuousAchievements()
+    -- The Centurion: 100 pages in continuous reading
+    if self.session.continuous_pages >= 100 then
+        self.achievements:unlock("centurion")
+    end
+    
+    -- Marathon: 3 hours of continuous active reading
+    if self.session.continuous_start_time then
+        local continuous_seconds = self.session.active_reading_seconds
+        if continuous_seconds >= 10800 then  -- 3 hours
+            self.achievements:unlock("marathon")
+        end
+    end
+    
+    -- Sprint: 50 pages in under 30 minutes of active reading
+    if self.session.continuous_pages >= 50 then
+        local continuous_time = os.time() - (self.session.continuous_start_time or os.time())
+        if continuous_time <= 1800 then  -- 30 minutes
+            self.achievements:unlock("sprint")
+        end
+    end
 end
 
 function ReadMastery:onLevelUp(new_level)
@@ -232,15 +305,15 @@ function ReadMastery:resetProgress()
 end
 
 -- Debug mode toggle
--- function ReadMastery:toggleDebugMode()
---     self.core.data.debug_mode = not self.core.data.debug_mode
---     self.core:save()
+function ReadMastery:toggleDebugMode()
+    self.core.data.debug_mode = not self.core.data.debug_mode
+    self.core:save()
     
---     local status = self.core.data.debug_mode and _("enabled") or _("disabled")
---     UIManager:show(InfoMessage:new{
---         text = T(_("Debug Mode %1."), status),
---         timeout = 2,
---     })
--- end
+    local status = self.core.data.debug_mode and _("enabled") or _("disabled")
+    UIManager:show(InfoMessage:new{
+        text = T(_("Debug Mode %1."), status),
+        timeout = 2,
+    })
+end
 
 return ReadMastery

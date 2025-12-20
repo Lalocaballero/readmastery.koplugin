@@ -33,21 +33,21 @@ Achievements.DEFINITIONS = {
     centurion = {
         id = "centurion",
         name = "The Centurion",
-        description = "Read 100 pages in a single session",
+        description = "Read 100 pages in a single session without long breaks",
         icon = Icons.ACH_CENTURION,
         category = "session",
     },
     marathon = {
         id = "marathon",
         name = "Marathon",
-        description = "Read for 3 hours continuously",
+        description = "Actively read for 3 hours (page turns within 2 min)",
         icon = Icons.ACH_MARATHON,
         category = "session",
     },
     sprint = {
         id = "sprint",
         name = "Sprint",
-        description = "Read 50 pages in under 30 minutes",
+        description = "Read 50 pages in under 30 minutes of active reading",
         icon = Icons.ACH_SPRINT,
         category = "session",
     },
@@ -128,21 +128,10 @@ function Achievements:checkTimeBasedAchievements()
     end
 end
 
-function Achievements:checkSessionAchievements(session, duration)
-    -- The Centurion (100 pages in single session)
-    if session.pages_read >= 100 then
-        self:unlock("centurion")
-    end
-    
-    -- Marathon (3 hours continuous)
-    if duration >= 10800 then -- 3 hours in seconds
-        self:unlock("marathon")
-    end
-    
-    -- Sprint (50 pages in under 30 minutes)
-    if session.pages_read >= 50 and duration <= 1800 then
-        self:unlock("sprint")
-    end
+-- Session achievements are now checked in main.lua with continuous tracking
+function Achievements:checkSessionAchievements(session, active_duration)
+    -- These are now handled by checkContinuousAchievements in main.lua
+    -- This function is kept for any additional session-end checks
 end
 
 function Achievements:checkMilestoneAchievements()
@@ -200,7 +189,7 @@ function Achievements:getAll()
     local result = {}
     
     for id, def in pairs(self.DEFINITIONS) do
-        local unlocked = self.core:isAchievementUnlocked(id) --or self.core:isDebugMode()
+        local unlocked = self.core:isAchievementUnlocked(id) or self.core:isDebugMode()
         table.insert(result, {
             id = id,
             name = def.name,
