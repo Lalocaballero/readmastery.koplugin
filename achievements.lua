@@ -188,8 +188,26 @@ end
 function Achievements:getAll()
     local result = {}
     
+    -- Safety check for debug mode
+    local debug_mode = false
+    if self.core and self.core.isDebugMode then
+        debug_mode = self.core:isDebugMode()
+    elseif self.core and self.core.data then
+        debug_mode = self.core.data.debug_mode or false
+    end
+    
     for id, def in pairs(self.DEFINITIONS) do
-        local unlocked = self.core:isAchievementUnlocked(id) or self.core:isDebugMode()
+        -- Safety check for core
+        local unlocked = false
+        if self.core and self.core.isAchievementUnlocked then
+            unlocked = self.core:isAchievementUnlocked(id) or debug_mode
+        end
+        
+        local unlocked_at = nil
+        if unlocked and self.core and self.core.data and self.core.data.achievements and self.core.data.achievements[id] then
+            unlocked_at = self.core.data.achievements[id].unlocked_at
+        end
+        
         table.insert(result, {
             id = id,
             name = def.name,
@@ -197,7 +215,7 @@ function Achievements:getAll()
             icon = def.icon,
             category = def.category,
             unlocked = unlocked,
-            unlocked_at = unlocked and self.core.data.achievements[id] and self.core.data.achievements[id].unlocked_at,
+            unlocked_at = unlocked_at,
         })
     end
     
@@ -215,7 +233,7 @@ end
 function Achievements:getUnlockedCount()
     local count = 0
     for id, _ in pairs(self.DEFINITIONS) do
-        if self.core:isAchievementUnlocked(id) then
+        if self.core and self.core.isAchievementUnlocked and self.core:isAchievementUnlocked(id) then
             count = count + 1
         end
     end

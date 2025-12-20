@@ -318,9 +318,9 @@ function ReadMasteryCore:canAccessFeature(required_level)
     return self.data.level >= required_level
 end
 
---function ReadMasteryCore:isDebugMode()
---    return self.data.debug_mode
---end
+function ReadMasteryCore:isDebugMode()
+    return self.data.debug_mode
+end
 
 function ReadMasteryCore:isSandboxMode()
     return self.data.sandbox_mode
