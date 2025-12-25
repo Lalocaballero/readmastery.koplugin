@@ -181,6 +181,11 @@ function ReadMastery:endSession()
 end
 
 -- Called on every page turn
+-- Maximum pages that count as "normal" reading
+-- Anything above this is considered a jump (table of contents, random page, etc.)
+local MAX_NORMAL_PAGE_JUMP = 5
+
+-- Called on every page turn
 function ReadMastery:onPageUpdate(page)
     if not self.session.is_active then return end
     
@@ -192,6 +197,18 @@ function ReadMastery:onPageUpdate(page)
     -- Track page turn
     if self.session.last_page and current_page ~= self.session.last_page then
         local pages_turned = math.abs(current_page - self.session.last_page)
+        
+        -- Check if this is a large jump (random page, TOC, bookmark, etc.)
+        if pages_turned > MAX_NORMAL_PAGE_JUMP then
+            -- Large jump detected - don't count pages, reset continuous reading
+            logger.dbg("ReadMastery: Large page jump detected (", pages_turned, " pages) - not counting")
+            self.session.last_page = current_page
+            self.session.last_page_turn_time = now
+            self.session.continuous_pages = 0
+            self.session.continuous_start_time = now
+            return
+        end
+        
         self.session.pages_read = self.session.pages_read + pages_turned
         
         -- Calculate active reading time since last page turn
@@ -235,7 +252,7 @@ function ReadMastery:onPageUpdate(page)
         -- Update daily pages for today
         self.core:addDailyPages(pages_turned)
         
-        -- Check achievements (pass continuous reading data)
+        -- Check achievements
         self.achievements:checkAllAchievements()
         self:checkContinuousAchievements()
     end

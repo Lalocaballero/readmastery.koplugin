@@ -99,23 +99,25 @@ end
 function AchievementsView:showAchievementDetail(achievement)
     local ascii = AsciiArt.getLarge(achievement.id, achievement.unlocked)
     
-    local status_line = achievement.unlocked and "[UNLOCKED]" or "[LOCKED]"
+    local status_text = achievement.unlocked and "[UNLOCKED]" or "[LOCKED]"
+    local title = string.upper(achievement.name) .. " " .. status_text
     
-    local footer_text = ""
+    local footer = ""
     if achievement.unlocked then
-        footer_text = achievement.description
+        footer = achievement.description
         if achievement.unlocked_at then
-            footer_text = footer_text .. "\nUnlocked: " .. os.date("%B %d, %Y", achievement.unlocked_at)
+            local unlock_date = os.date("%b %d, %Y", achievement.unlocked_at)
+            footer = footer .. "\n\nUnlocked: " .. unlock_date
         end
     else
-        footer_text = "Keep reading to unlock!"
+        footer = "Keep reading to unlock!"
     end
-    footer_text = footer_text .. "\n\n(Tap to close)"
+    footer = footer .. "\n\n(Tap to close)"
     
     local popup = AsciiPopup:new{
-        title = string.upper(achievement.name) .. " " .. status_line,
+        title = title,
         ascii_art = ascii,
-        footer = footer_text,
+        footer = footer,
     }
     popup:init()
     UIManager:show(popup)
