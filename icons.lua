@@ -5,7 +5,7 @@
 
 local Icons = {}
 
--- Main UI Icons - Pure ASCII
+-- Main UI Icons
 Icons.STAR = "*"
 Icons.STAR_EMPTY = "."
 Icons.FIRE = "~"
@@ -39,6 +39,20 @@ Icons.SNOWFLAKE = "[F]"
 Icons.SUN = "(sun)"
 Icons.MOON = "(moon)"
 Icons.TARGET = "(+)"
+
+-- Tier Icons
+Icons.TIER_BRONZE = "(B)"
+Icons.TIER_SILVER = "(S)"
+Icons.TIER_GOLD = "(G)"
+Icons.TIER_PLATINUM = "(P)"
+
+-- Tier names for display
+Icons.TIER_NAMES = {
+    bronze = "Bronze",
+    silver = "Silver",
+    gold = "Gold",
+    platinum = "Platinum",
+}
 
 -- Progress bar characters
 Icons.PROGRESS_FULL = "#"
@@ -90,28 +104,23 @@ function Icons.progressBar(percentage, width)
                .. string.rep(Icons.PROGRESS_EMPTY, empty) .. "]"
 end
 
--- Helper function to build star ratings (e.g., for intensity)
-function Icons.starRating(value, max)
-    max = max or 5
-    local stars = ""
-    for i = 1, max do
-        if i <= value then
-            stars = stars .. Icons.STAR
-        else
-            stars = stars .. Icons.STAR_EMPTY
-        end
-    end
-    return stars
+-- Helper function to get tier icon
+function Icons.getTierIcon(tier)
+    local tier_icons = {
+        bronze = Icons.TIER_BRONZE,
+        silver = Icons.TIER_SILVER,
+        gold = Icons.TIER_GOLD,
+        platinum = Icons.TIER_PLATINUM,
+    }
+    return tier_icons[tier] or Icons.TIER_BRONZE
 end
 
--- Heatmap intensity characters (for vertical bars)
-function Icons.heatmapBar(intensity, max_height)
-    max_height = max_height or 5
-    local height = math.floor((intensity / 4) * max_height)
-    return string.rep(Icons.PROGRESS_FULL, height) .. string.rep(Icons.PROGRESS_EMPTY, max_height - height)
+-- Helper function to get tier name
+function Icons.getTierName(tier)
+    return Icons.TIER_NAMES[tier] or "Bronze"
 end
 
--- Vertical heatmap bar (returns characters for each level)
+-- Heatmap intensity characters
 function Icons.heatmapLevel(intensity)
     local levels = {
         [0] = ".....",

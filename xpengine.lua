@@ -13,8 +13,8 @@ end
 XPEngine.XP_PER_PAGE = 5
 XPEngine.XP_PER_MINUTE = 2
 XPEngine.STREAK_MULTIPLIER_BASE = 1.0
-XPEngine.STREAK_MULTIPLIER_INCREMENT = 0.05 -- 5% bonus per streak day
-XPEngine.MAX_STREAK_MULTIPLIER = 2.0 -- Cap at 100% bonus
+XPEngine.STREAK_MULTIPLIER_INCREMENT = 0.05
+XPEngine.MAX_STREAK_MULTIPLIER = 2.0
 
 function XPEngine:calculatePageXP(pages_turned)
     local base_xp = pages_turned * self.XP_PER_PAGE
@@ -38,7 +38,6 @@ function XPEngine:getStreakMultiplier()
 end
 
 function XPEngine:calculateBonusXP(achievement_id)
-    -- Bonus XP for achievements
     local bonuses = {
         early_bird = 50,
         night_owl = 50,
@@ -54,6 +53,18 @@ function XPEngine:calculateBonusXP(achievement_id)
     }
     
     return bonuses[achievement_id] or 50
+end
+
+-- XP bonus for tier upgrades
+function XPEngine:calculateTierXP(tier)
+    local tier_bonuses = {
+        bronze = 0,      -- No bonus for initial unlock (already got achievement XP)
+        silver = 100,
+        gold = 250,
+        platinum = 500,
+    }
+    
+    return tier_bonuses[tier] or 0
 end
 
 return XPEngine

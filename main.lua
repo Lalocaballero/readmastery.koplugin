@@ -333,4 +333,9 @@ function ReadMastery:toggleDebugMode()
     })
 end
 
+function ReadMastery:onTierUp(achievement_id, achievement, tier_info)
+    self.notifications:showTierUp(achievement_id, achievement, tier_info)
+    logger.info("ReadMastery: Tier up!", achievement_id, "->", tier_info.id)
+end
+
 return ReadMastery

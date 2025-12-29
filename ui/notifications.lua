@@ -3,6 +3,8 @@ local UIManager = require("ui/uimanager")
 local _ = require("gettext")
 
 local AsciiArt = require("ascii_art")
+local AsciiPopup = require("ui/ascii_popup")
+local Icons = require("icons")
 
 local Notifications = {}
 
@@ -56,9 +58,34 @@ function Notifications:showAchievement(achievement)
 
 ]] .. ascii .. [[
 
-]] .. achievement.name .. [[
+]] .. achievement.name .. " " .. Icons.TIER_BRONZE .. [[
 
 ]] .. achievement.description .. [[
+
+=============================
+]]
+    
+    UIManager:show(InfoMessage:new{
+        text = text,
+        timeout = 6,
+    })
+end
+
+function Notifications:showTierUp(achievement_id, achievement, tier_info)
+    local ascii = AsciiArt.getLarge(achievement_id, true)
+    local tier_icon = Icons.getTierIcon(tier_info.id)
+    local tier_name = Icons.getTierName(tier_info.id)
+    
+    local text = [[
+=============================
+       TIER UPGRADE!
+=============================
+
+]] .. ascii .. [[
+
+]] .. achievement.name .. [[
+
+       ]] .. tier_icon .. " " .. string.upper(tier_name) .. [[ ]] .. tier_icon .. [[
 
 =============================
 ]]

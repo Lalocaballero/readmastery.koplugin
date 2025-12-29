@@ -35,13 +35,13 @@ function ReadMasteryCore:getDefaultData()
         freeze_tokens = 0,
         
         -- Daily tracking
-        daily_pages = {}, -- { ["2024-01-15"] = 50, ... }
-        daily_reading_time = {}, -- { ["2024-01-15"] = 3600, ... }
+        daily_pages = {},
+        daily_reading_time = {},
         
         -- Session history
         sessions = {},
         
-        -- Achievements
+        -- Achievements with counts and tiers
         achievements = {},
         
         -- Format tracking
@@ -52,7 +52,7 @@ function ReadMasteryCore:getDefaultData()
         
         -- Settings
         sandbox_mode = false,
-        --debug_mode = false,
+        debug_mode = false,
         
         -- Timestamps
         created_at = os.time(),
@@ -75,10 +75,31 @@ function ReadMasteryCore:load()
                 end
             end
             self.data = decoded
+            
+            -- Migrate old achievement format to new format with counts
+            self:migrateAchievements()
+            
             logger.dbg("ReadMastery: Data loaded successfully")
         end
     else
         logger.dbg("ReadMastery: No existing data, using defaults")
+    end
+end
+
+-- Migrate old achievement format (just unlocked_at) to new format (with count and tier)
+function ReadMasteryCore:migrateAchievements()
+    for id, data in pairs(self.data.achievements) do
+        if type(data) == "table" then
+            -- Check if it's old format (only has unlocked_at)
+            if data.unlocked_at and not data.count then
+                self.data.achievements[id] = {
+                    unlocked_at = data.unlocked_at,
+                    count = 1,
+                    tier = "bronze",
+                }
+                logger.dbg("ReadMastery: Migrated achievement", id, "to new format")
+            end
+        end
     end
 end
 
@@ -116,14 +137,11 @@ function ReadMasteryCore:getLevel()
 end
 
 function ReadMasteryCore:updateLevel()
-    -- XP required for each level (exponential curve)
     local new_level = self:calculateLevelFromXP(self.data.xp)
     self.data.level = new_level
 end
 
 function ReadMasteryCore:calculateLevelFromXP(xp)
-    -- Level formula: each level requires progressively more XP
-    -- Level 1: 0 XP, Level 2: 100 XP, Level 3: 250 XP, etc.
     local level = 1
     local xp_needed = 0
     
@@ -169,7 +187,6 @@ function ReadMasteryCore:addDailyPages(pages)
     local today = os.date("%Y-%m-%d")
     self.data.daily_pages[today] = (self.data.daily_pages[today] or 0) + pages
     
-    -- Update record
     if self.data.daily_pages[today] > self.data.most_pages_single_day then
         self.data.most_pages_single_day = self.data.daily_pages[today]
     end
@@ -200,7 +217,6 @@ end
 function ReadMasteryCore:recordSession(session_data)
     table.insert(self.data.sessions, session_data)
     
-    -- Keep only last 100 sessions
     while #self.data.sessions > 100 do
         table.remove(self.data.sessions, 1)
     end
@@ -251,16 +267,52 @@ function ReadMasteryCore:getBooksCompleted()
     return self.data.books_completed
 end
 
--- Achievements
+-- Achievement Methods (Updated for Tiers)
 function ReadMasteryCore:isAchievementUnlocked(id)
     return self.data.achievements[id] ~= nil
+end
+
+function ReadMasteryCore:getAchievementData(id)
+    return self.data.achievements[id]
+end
+
+function ReadMasteryCore:getAchievementCount(id)
+    if self.data.achievements[id] then
+        return self.data.achievements[id].count or 1
+    end
+    return 0
+end
+
+function ReadMasteryCore:getAchievementTier(id)
+    if self.data.achievements[id] then
+        return self.data.achievements[id].tier or "bronze"
+    end
+    return nil
 end
 
 function ReadMasteryCore:unlockAchievement(id)
     if not self.data.achievements[id] then
         self.data.achievements[id] = {
             unlocked_at = os.time(),
+            count = 1,
+            tier = "bronze",
         }
+        return true
+    end
+    return false
+end
+
+function ReadMasteryCore:incrementAchievementCount(id)
+    if self.data.achievements[id] then
+        self.data.achievements[id].count = (self.data.achievements[id].count or 1) + 1
+        return self.data.achievements[id].count
+    end
+    return 0
+end
+
+function ReadMasteryCore:setAchievementTier(id, tier)
+    if self.data.achievements[id] then
+        self.data.achievements[id].tier = tier
         return true
     end
     return false
@@ -319,11 +371,11 @@ function ReadMasteryCore:canAccessFeature(required_level)
 end
 
 function ReadMasteryCore:isDebugMode()
-    return self.data.debug_mode
+    return self.data.debug_mode or false
 end
 
 function ReadMasteryCore:isSandboxMode()
-    return self.data.sandbox_mode
+    return self.data.sandbox_mode or false
 end
 
 return ReadMasteryCore
