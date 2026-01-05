@@ -16,7 +16,6 @@ local Analytics = require("analytics")
 local FeatureUnlocks = require("featureunlocks")
 local MainMenu = require("ui/mainmenu")
 local Notifications = require("ui/notifications")
-local ProjectTitleIntegration = require("projecttitle_integration")
 local TitleBarIntegration = require("titlebar_integration")
 
 local ReadMastery = WidgetContainer:extend{
@@ -49,7 +48,6 @@ function ReadMastery:init()
     
     -- Initialize integrations
     self.integrations = {
-        project_title = ProjectTitleIntegration,
         title_bar = TitleBarIntegration,
     }
     
@@ -90,10 +88,6 @@ function ReadMastery:ensureDataDir()
 end
 
 function ReadMastery:initIntegrations()
-    -- Project Title integration
-    if self.core.data.enable_pt_integration ~= false then
-        self.pt_integrated = ProjectTitleIntegration:init(self.core)
-    end
     
     -- Title Bar integration
     if self.core.data.enable_tb_integration ~= false then
