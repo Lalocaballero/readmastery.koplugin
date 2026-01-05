@@ -42,6 +42,10 @@ function MainMenu:getMenuTable()
             sub_item_table = self:getAnalyticsMenu(),
         },
         {
+            text = "Display",
+            sub_item_table = self:getDisplayMenu(),
+        },
+        {
             text = "Settings",
             sub_item_table = self:getSettingsMenu(),
         },
@@ -61,6 +65,7 @@ end
 function MainMenu:showStreakInfo()
     local streak_info = self.plugin.streak_manager:getStreakInfo()
     local xp_info = self.plugin.core:getXPForNextLevel()
+    local tier_counts = self.plugin.achievements:getTierCounts()
     
     local text = [[
 ====== STREAK INFO ======
@@ -76,11 +81,24 @@ Level:          ]] .. self.plugin.core:getLevel() .. [[
 
 XP:             ]] .. xp_info.current .. [[ / ]] .. xp_info.needed .. [[
 
-Lifetime Pages: ]] .. self.plugin.core:getLifetimePages()
+Lifetime Pages: ]] .. self.plugin.core:getLifetimePages() .. [[
+
+
+==== ACHIEVEMENT TIERS ====
+
+Bronze:   ]] .. tier_counts.bronze .. [[
+
+Silver:   ]] .. tier_counts.silver .. [[
+
+Gold:     ]] .. tier_counts.gold .. [[
+
+Platinum: ]] .. tier_counts.platinum .. [[
+
+]]
     
     UIManager:show(InfoMessage:new{
         text = text,
-        timeout = 10,
+        timeout = 15,
     })
 end
 
@@ -301,6 +319,125 @@ Member Since: ]] .. fame.member_since .. [[
     })
 end
 
+-- Display Menu
+function MainMenu:getDisplayMenu()
+    return {
+        {
+            text = "Title Bar Display",
+            sub_item_table = self:getTitleBarFormatMenu(),
+        },
+        {
+            text = "Gesture Actions",
+            callback = function()
+                self:showGestureInfo()
+            end,
+        },
+    }
+end
+
+function MainMenu:getTitleBarFormatMenu()
+    -- Check if title bar patch is installed
+    local lfs = require("libs/libkoreader-lfs")
+    local tb_available = false
+    local patch_paths = {
+        "patches/2-filemanager-titlebar.lua",
+        "patches/2-filemanager-title-bar.lua",
+    }
+    for _, path in ipairs(patch_paths) do
+        if lfs.attributes(path, "mode") == "file" then
+            tb_available = true
+            break
+        end
+    end
+    
+    if not tb_available then
+        return {
+            {
+                text = "Title Bar Patch not installed",
+                enabled = false,
+            },
+            {
+                text = "Get it from KOReader mods/patches",
+                enabled = false,
+            },
+        }
+    end
+    
+    local formats = {
+        { id = "streak_only", name = "Streak Only", example = "~5" },
+        { id = "level_only", name = "Level Only", example = "Lv3" },
+        { id = "streak_level", name = "Streak + Level", example = "~5 Lv3" },
+        { id = "full", name = "Full", example = "~5 Lv3 42pg" },
+    }
+    
+    local menu = {
+        {
+            text = "Enable in Title Bar menu:",
+            enabled = false,
+        },
+        {
+            text = "File Browser > Title bar > ReadMastery",
+            enabled = false,
+            separator = true,
+        },
+    }
+    
+    for _, fmt in ipairs(formats) do
+        table.insert(menu, {
+            text_func = function()
+                local current = self.plugin.core.data.tb_display_format or "streak_level"
+                local marker = current == fmt.id and " [x]" or ""
+                return fmt.name .. " (" .. fmt.example .. ")" .. marker
+            end,
+            callback = function()
+                self.plugin.core.data.tb_display_format = fmt.id
+                self.plugin.core:save()
+                
+                UIManager:show(InfoMessage:new{
+                    text = "Title Bar format: " .. fmt.example .. "\n\nRefresh file browser to see changes.",
+                    timeout = 3,
+                })
+            end,
+            keep_menu_open = true,
+        })
+    end
+    
+    return menu
+end
+
+function MainMenu:showGestureInfo()
+    local text = [[
+===== GESTURE ACTIONS =====
+
+ReadMastery adds these actions
+to Settings > Gestures:
+
+- Show Stats
+  Opens full stats view
+
+- Show Streak Info
+  Opens streak details
+
+- Show Achievements
+  Opens achievements list
+
+- Quick Stats Popup
+  Small popup with key stats
+
+To assign a gesture:
+1. Go to Settings > Gestures
+2. Choose a gesture
+3. Select a ReadMastery action
+
+===========================
+]]
+    
+    UIManager:show(InfoMessage:new{
+        text = text,
+        timeout = 15,
+    })
+end
+
 function MainMenu:getSettingsMenu()
     return {
         {
@@ -313,17 +450,16 @@ function MainMenu:getSettingsMenu()
             end,
             keep_menu_open = true,
         },
-        --{
-        --    text_func = function()
-        --       local status = self.plugin.core:isDebugMode() and "ON" or "OFF"
-        --        return "Debug Mode (" .. status .. ")"
-        --    end,
-        --    callback = function()
-        --        self.plugin:toggleDebugMode()
-        --    end,
-        --    keep_menu_open = true,
-        --},
-        --},
+        {
+            text_func = function()
+                local status = self.plugin.core:isDebugMode() and "ON" or "OFF"
+                return "Debug Mode (" .. status .. ")"
+            end,
+            callback = function()
+                self.plugin:toggleDebugMode()
+            end,
+            keep_menu_open = true,
+        },
         {
             text = "Reset All Progress",
             callback = function()
@@ -365,14 +501,16 @@ end
 function MainMenu:showAbout()
     local text = [[
 ======= READMASTERY =======
-         v1.0
+         v1.2.0
 
 Gamify your reading with:
 
 * XP for every page & minute
 * Level up to unlock features  
 * Daily streaks with freeze tokens
-* 11 unique achievements
+* 11 achievements with 4 tiers
+* Gesture support
+* Title bar integration
 
 Keep reading, keep growing!
 

@@ -54,6 +54,14 @@ function ReadMasteryCore:getDefaultData()
         sandbox_mode = false,
         debug_mode = false,
         
+        -- Overlay settings
+        show_overlay = false,
+        overlay_position = "top_right",
+        overlay_format = "streak_level",
+        
+        -- Title bar settings
+        tb_display_format = "streak_level",
+        
         -- Timestamps
         created_at = os.time(),
         updated_at = os.time(),

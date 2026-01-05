@@ -16,14 +16,17 @@ local Analytics = require("analytics")
 local FeatureUnlocks = require("featureunlocks")
 local MainMenu = require("ui/mainmenu")
 local Notifications = require("ui/notifications")
+local ProjectTitleIntegration = require("projecttitle_integration")
+local TitleBarIntegration = require("titlebar_integration")
 
 local ReadMastery = WidgetContainer:extend{
     name = "readmastery",
     is_doc_only = false,
 }
 
--- How long (in seconds) before we consider the user idle
+-- Constants
 local IDLE_TIMEOUT = 120  -- 2 minutes without page turn = idle
+local MAX_NORMAL_PAGE_JUMP = 5  -- Jumps larger than this don't count
 
 function ReadMastery:init()
     self.data_dir = DataStorage:getDataDir() .. "/readmastery"
@@ -44,6 +47,15 @@ function ReadMastery:init()
     self.notifications = Notifications:new{ plugin = self }
     self.main_menu = MainMenu:new{ plugin = self }
     
+    -- Initialize integrations
+    self.integrations = {
+        project_title = ProjectTitleIntegration,
+        title_bar = TitleBarIntegration,
+    }
+    
+    -- Try to integrate with external plugins
+    self:initIntegrations()
+    
     -- Session tracking
     self.session = {
         start_time = nil,
@@ -52,15 +64,17 @@ function ReadMastery:init()
         current_format = nil,
         last_page = nil,
         is_active = false,
-        -- NEW: Active reading tracking
         last_page_turn_time = nil,
         active_reading_seconds = 0,
-        continuous_pages = 0,  -- Pages without long break
-        continuous_start_time = nil,  -- When continuous reading started
+        continuous_pages = 0,
+        continuous_start_time = nil,
     }
     
     -- Register menu
     self.ui.menu:registerToMainMenu(self)
+    
+    -- Register gesture actions
+    self:registerGestureActions()
     
     -- Check daily streak on init
     self.streak_manager:checkDailyStreak()
@@ -73,6 +87,94 @@ function ReadMastery:ensureDataDir()
     if lfs.attributes(self.data_dir, "mode") ~= "directory" then
         lfs.mkdir(self.data_dir)
     end
+end
+
+function ReadMastery:initIntegrations()
+    -- Project Title integration
+    if self.core.data.enable_pt_integration ~= false then
+        self.pt_integrated = ProjectTitleIntegration:init(self.core)
+    end
+    
+    -- Title Bar integration
+    if self.core.data.enable_tb_integration ~= false then
+        self.tb_integrated = TitleBarIntegration:init(self.core)
+    end
+    
+    logger.dbg("ReadMastery: Integrations initialized. PT:", self.pt_integrated, "TB:", self.tb_integrated)
+end
+
+-- Register actions for gesture system
+function ReadMastery:registerGestureActions()
+    Dispatcher:registerAction("readmastery_show_stats", {
+        category = "none",
+        event = "ReadMasteryShowStats",
+        title = _("ReadMastery: Show Stats"),
+        general = true,
+    })
+    
+    Dispatcher:registerAction("readmastery_show_streak", {
+        category = "none",
+        event = "ReadMasteryShowStreak",
+        title = _("ReadMastery: Show Streak Info"),
+        general = true,
+    })
+    
+    Dispatcher:registerAction("readmastery_show_achievements", {
+        category = "none",
+        event = "ReadMasteryShowAchievements",
+        title = _("ReadMastery: Show Achievements"),
+        general = true,
+    })
+    
+    Dispatcher:registerAction("readmastery_quick_stats", {
+        category = "none",
+        event = "ReadMasteryQuickStats",
+        title = _("ReadMastery: Quick Stats Popup"),
+        general = true,
+    })
+end
+
+-- Gesture event handlers
+function ReadMastery:onReadMasteryShowStats()
+    local StatsView = require("ui/statsview")
+    local stats_view = StatsView:new{ plugin = self }
+    stats_view:show()
+    return true
+end
+
+function ReadMastery:onReadMasteryShowStreak()
+    self.main_menu:showStreakInfo()
+    return true
+end
+
+function ReadMastery:onReadMasteryShowAchievements()
+    local AchievementsView = require("ui/achievements_view")
+    local achievements_view = AchievementsView:new{ plugin = self }
+    achievements_view:show()
+    return true
+end
+
+function ReadMastery:onReadMasteryQuickStats()
+    self:showQuickStats()
+    return true
+end
+
+-- Quick stats popup (minimal, fast)
+function ReadMastery:showQuickStats()
+    local streak = self.core:getStreak()
+    local level = self.core:getLevel()
+    local xp_info = self.core:getXPForNextLevel()
+    local pages_today = self.core:getDailyPages()
+    
+    local text = "Lv." .. level .. " | " ..
+                 "Streak: " .. streak .. " | " ..
+                 "Today: " .. pages_today .. "pg | " ..
+                 "XP: " .. xp_info.current .. "/" .. xp_info.needed
+    
+    UIManager:show(InfoMessage:new{
+        text = text,
+        timeout = 3,
+    })
 end
 
 function ReadMastery:addToMainMenu(menu_items)
@@ -110,7 +212,6 @@ function ReadMastery:startSession()
         book_path = file_path,
         last_page = self.ui.document:getCurrentPage(),
         is_active = true,
-        -- Active reading tracking
         last_page_turn_time = now,
         active_reading_seconds = 0,
         continuous_pages = 0,
@@ -129,8 +230,10 @@ end
 function ReadMastery:endSession()
     if not self.session.is_active then return end
     
+    -- Mark today as active (handles midnight crossover)
+    self.streak_manager:markTodayActive()
+    
     -- Calculate final active reading time
-    -- Add any remaining time since last page turn (up to IDLE_TIMEOUT)
     local now = os.time()
     if self.session.last_page_turn_time then
         local time_since_last_turn = now - self.session.last_page_turn_time
@@ -147,7 +250,7 @@ function ReadMastery:endSession()
     
     -- Update session stats
     self.core:recordSession({
-        duration = self.session.active_reading_seconds,  -- Store active time, not total time
+        duration = self.session.active_reading_seconds,
         pages = self.session.pages_read,
         book = self.session.current_book,
         format = self.session.current_format,
@@ -179,11 +282,6 @@ function ReadMastery:endSession()
     logger.dbg("ReadMastery: Session ended. Pages:", self.session.pages_read, 
                "Active Minutes:", session_minutes)
 end
-
--- Called on every page turn
--- Maximum pages that count as "normal" reading
--- Anything above this is considered a jump (table of contents, random page, etc.)
-local MAX_NORMAL_PAGE_JUMP = 5
 
 -- Called on every page turn
 function ReadMastery:onPageUpdate(page)
@@ -252,7 +350,7 @@ function ReadMastery:onPageUpdate(page)
         -- Update daily pages for today
         self.core:addDailyPages(pages_turned)
         
-        -- Check achievements
+        -- Check achievements (pass continuous reading data)
         self.achievements:checkAllAchievements()
         self:checkContinuousAchievements()
     end
@@ -264,14 +362,14 @@ end
 function ReadMastery:checkContinuousAchievements()
     -- The Centurion: 100 pages in continuous reading
     if self.session.continuous_pages >= 100 then
-        self.achievements:unlock("centurion")
+        self.achievements:progressAchievement("centurion")
     end
     
     -- Marathon: 3 hours of continuous active reading
     if self.session.continuous_start_time then
         local continuous_seconds = self.session.active_reading_seconds
         if continuous_seconds >= 10800 then  -- 3 hours
-            self.achievements:unlock("marathon")
+            self.achievements:progressAchievement("marathon")
         end
     end
     
@@ -279,7 +377,7 @@ function ReadMastery:checkContinuousAchievements()
     if self.session.continuous_pages >= 50 then
         local continuous_time = os.time() - (self.session.continuous_start_time or os.time())
         if continuous_time <= 1800 then  -- 30 minutes
-            self.achievements:unlock("sprint")
+            self.achievements:progressAchievement("sprint")
         end
     end
 end
@@ -296,6 +394,11 @@ end
 function ReadMastery:onAchievementUnlocked(achievement_id, achievement_data)
     self.notifications:showAchievement(achievement_data)
     logger.info("ReadMastery: Achievement unlocked!", achievement_id)
+end
+
+function ReadMastery:onTierUp(achievement_id, achievement, tier_info)
+    self.notifications:showTierUp(achievement_id, achievement, tier_info)
+    logger.info("ReadMastery: Tier up!", achievement_id, "->", tier_info.id)
 end
 
 -- Sandbox mode toggle
@@ -331,11 +434,6 @@ function ReadMastery:toggleDebugMode()
         text = T(_("Debug Mode %1."), status),
         timeout = 2,
     })
-end
-
-function ReadMastery:onTierUp(achievement_id, achievement, tier_info)
-    self.notifications:showTierUp(achievement_id, achievement, tier_info)
-    logger.info("ReadMastery: Tier up!", achievement_id, "->", tier_info.id)
 end
 
 return ReadMastery
