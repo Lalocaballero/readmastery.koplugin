@@ -181,6 +181,13 @@ end
 
 -- Called when a document is opened
 function ReadMastery:onReaderReady()
+    -- Guard against re-initialization (e.g., on orientation change)
+    -- If a session is already active for the same document, don't restart
+    if self.session.is_active and self.ui.document 
+       and self.ui.document.file == self.session.book_path then
+        logger.dbg("ReadMastery: onReaderReady called but session already active, skipping")
+        return
+    end
     self:startSession()
 end
 
@@ -194,9 +201,17 @@ function ReadMastery:startSession()
     
     local props = self.ui.document:getProps()
     local file_path = self.ui.document.file
-    local format = file_path:match("%.([^%.]+)$"):upper()
+    local ext = file_path:match("%.([^%.]+)$")
+    local format = ext and ext:upper() or "UNKNOWN"
     
     local now = os.time()
+    
+    -- Safely get current page (some document types like CBZ may not support getCurrentPage)
+    local current_page = nil
+    if self.ui.document.getCurrentPage then
+        local ok, page = pcall(self.ui.document.getCurrentPage, self.ui.document)
+        if ok then current_page = page end
+    end
     
     self.session = {
         start_time = now,
@@ -204,7 +219,7 @@ function ReadMastery:startSession()
         current_book = props.title or file_path:match("([^/]+)$"),
         current_format = format,
         book_path = file_path,
-        last_page = self.ui.document:getCurrentPage(),
+        last_page = current_page,
         is_active = true,
         last_page_turn_time = now,
         active_reading_seconds = 0,
@@ -254,15 +269,21 @@ function ReadMastery:endSession()
     -- Check session-based achievements with ACTIVE reading time
     self.achievements:checkSessionAchievements(self.session, self.session.active_reading_seconds)
     
-    -- Check book completion
+    -- Check book completion (safely handle document types that may not support page methods)
     if self.ui.document then
-        local total_pages = self.ui.document:getPageCount()
-        local current_page = self.ui.document:getCurrentPage()
-        local completion = (current_page / total_pages) * 100
+        local ok, total_pages, current_page
+        ok, total_pages = pcall(function() return self.ui.document:getPageCount() end)
+        if ok and total_pages then
+            ok, current_page = pcall(function() return self.ui.document:getCurrentPage() end)
+        end
         
-        if completion >= 95 then
-            self.achievements:unlock("book_slayer")
-            self.core:incrementBooksCompleted()
+        if ok and total_pages and current_page and total_pages > 0 then
+            local completion = (current_page / total_pages) * 100
+            
+            if completion >= 95 then
+                self.achievements:unlock("book_slayer")
+                self.core:incrementBooksCompleted()
+            end
         end
         
         -- Track book started
@@ -281,7 +302,13 @@ end
 function ReadMastery:onPageUpdate(page)
     if not self.session.is_active then return end
     
-    local current_page = page or (self.ui.document and self.ui.document:getCurrentPage())
+    local current_page = page
+    if not current_page and self.ui.document then
+        if self.ui.document.getCurrentPage then
+            local ok, p = pcall(self.ui.document.getCurrentPage, self.ui.document)
+            if ok then current_page = p end
+        end
+    end
     if not current_page then return end
     
     local now = os.time()
@@ -354,23 +381,31 @@ end
 
 -- Check achievements that require continuous reading
 function ReadMastery:checkContinuousAchievements()
+    -- Initialize session achievement tracking (only trigger each once per session)
+    if not self.session._achievements_triggered then
+        self.session._achievements_triggered = {}
+    end
+    
     -- The Centurion: 100 pages in continuous reading
-    if self.session.continuous_pages >= 100 then
+    if self.session.continuous_pages >= 100 and not self.session._achievements_triggered["centurion"] then
+        self.session._achievements_triggered["centurion"] = true
         self.achievements:progressAchievement("centurion")
     end
     
     -- Marathon: 3 hours of continuous active reading
-    if self.session.continuous_start_time then
+    if self.session.continuous_start_time and not self.session._achievements_triggered["marathon"] then
         local continuous_seconds = self.session.active_reading_seconds
         if continuous_seconds >= 10800 then  -- 3 hours
+            self.session._achievements_triggered["marathon"] = true
             self.achievements:progressAchievement("marathon")
         end
     end
     
     -- Sprint: 50 pages in under 30 minutes of active reading
-    if self.session.continuous_pages >= 50 then
+    if self.session.continuous_pages >= 50 and not self.session._achievements_triggered["sprint"] then
         local continuous_time = os.time() - (self.session.continuous_start_time or os.time())
         if continuous_time <= 1800 then  -- 30 minutes
+            self.session._achievements_triggered["sprint"] = true
             self.achievements:progressAchievement("sprint")
         end
     end

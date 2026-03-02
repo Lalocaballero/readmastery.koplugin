@@ -30,9 +30,16 @@ function AsciiPopup:init()
     local screen_width = Screen:getWidth()
     local screen_height = Screen:getHeight()
     
-    -- Calculate popup size (80% of screen)
-    self.width = self.width or math.floor(screen_width * 0.85)
-    self.height = self.height or math.floor(screen_height * 0.80)
+    -- Detect orientation: use the smaller dimension to keep ASCII art proportional
+    local is_landscape = screen_width > screen_height
+    
+    -- In landscape, use a narrower popup relative to screen width to keep ASCII art readable
+    -- In portrait, use standard sizing
+    local width_ratio = is_landscape and 0.60 or 0.85
+    local height_ratio = is_landscape and 0.90 or 0.80
+    
+    self.width = self.width or math.floor(screen_width * width_ratio)
+    self.height = self.height or math.floor(screen_height * height_ratio)
     
     if Device:isTouchDevice() then
         self.ges_events.TapClose = {
@@ -72,7 +79,9 @@ function AsciiPopup:init()
     }
     
     -- ASCII Art widget (monospace font, centered)
-    local mono_face = Font:getFace("infont", 12)
+    -- Adjust font size based on orientation to keep ASCII art proportional
+    local mono_size = is_landscape and 10 or 12
+    local mono_face = Font:getFace("infont", mono_size)
     
     -- Calculate ASCII art dimensions
     local ascii_lines = {}

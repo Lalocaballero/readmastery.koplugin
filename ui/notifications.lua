@@ -51,24 +51,12 @@ end
 function Notifications:showAchievement(achievement)
     local ascii = AsciiArt.getLarge(achievement.id, true)
     
-    local text = [[
-=============================
-   ACHIEVEMENT UNLOCKED!
-=============================
-
-]] .. ascii .. [[
-
-]] .. achievement.name .. " " .. Icons.TIER_BRONZE .. [[
-
-]] .. achievement.description .. [[
-
-=============================
-]]
-    
-    UIManager:show(InfoMessage:new{
-        text = text,
-        timeout = 6,
-    })
+    local popup = AsciiPopup:new{
+        title = "ACHIEVEMENT UNLOCKED!",
+        ascii_art = ascii,
+        footer = achievement.name .. " " .. Icons.TIER_BRONZE .. "\n" .. achievement.description,
+    }
+    UIManager:show(popup)
 end
 
 function Notifications:showTierUp(achievement_id, achievement, tier_info)
@@ -76,24 +64,12 @@ function Notifications:showTierUp(achievement_id, achievement, tier_info)
     local tier_icon = Icons.getTierIcon(tier_info.id)
     local tier_name = Icons.getTierName(tier_info.id)
     
-    local text = [[
-=============================
-       TIER UPGRADE!
-=============================
-
-]] .. ascii .. [[
-
-]] .. achievement.name .. [[
-
-       ]] .. tier_icon .. " " .. string.upper(tier_name) .. [[ ]] .. tier_icon .. [[
-
-=============================
-]]
-    
-    UIManager:show(InfoMessage:new{
-        text = text,
-        timeout = 6,
-    })
+    local popup = AsciiPopup:new{
+        title = "TIER UPGRADE!",
+        ascii_art = ascii,
+        footer = achievement.name .. "\n" .. tier_icon .. " " .. string.upper(tier_name) .. " " .. tier_icon,
+    }
+    UIManager:show(popup)
 end
 
 function Notifications:showStreakMilestone(days)

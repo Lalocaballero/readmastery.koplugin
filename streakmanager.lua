@@ -33,8 +33,15 @@ function StreakManager:checkDailyStreak()
         return
     end
     
-    -- Missed at least one day
-    local days_missed = self:daysBetween(last_active, today)
+    -- Calculate actual days missed (days between last active and today, minus 1)
+    -- e.g., if last_active was 2 days ago, days_between = 2, days_missed = 1
+    local days_between = self:daysBetween(last_active, today)
+    local days_missed = days_between - 1  -- subtract 1 because "yesterday" = 0 missed days
+    
+    if days_missed <= 0 then
+        -- This shouldn't happen given the checks above, but be safe
+        return
+    end
     
     if days_missed == 1 then
         -- Missed exactly one day, try to use freeze token
@@ -64,12 +71,24 @@ function StreakManager:markTodayActive()
         
         if last_active then
             local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
-            if last_active == yesterday then
-                -- Continuing streak
+            local days_gap = self:daysBetween(last_active, today)
+            
+            if last_active == yesterday or days_gap <= 1 then
+                -- Continuing streak (yesterday or same day edge case)
+                self.core:setStreak(current_streak + 1)
+            elseif days_gap == 2 and current_streak > 0 then
+                -- Missed exactly one day - streak may have been preserved by freeze token
+                -- in checkDailyStreak. If streak is still > 0, it was preserved.
                 self.core:setStreak(current_streak + 1)
             else
-                -- Starting fresh (reset should have happened in checkDailyStreak)
-                self.core:setStreak(1)
+                -- Gap too large or streak was already reset
+                if current_streak > 0 then
+                    -- Streak was preserved somehow (freeze token), continue it
+                    self.core:setStreak(current_streak + 1)
+                else
+                    -- Starting fresh
+                    self.core:setStreak(1)
+                end
             end
         else
             -- First day ever

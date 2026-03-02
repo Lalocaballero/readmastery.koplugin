@@ -53,6 +53,33 @@ Analytics features unlock as you level up:
 
 ---
 
+## 📋 Changelog
+
+### v1.3.0 (2026-03-02)
+
+#### Bug Fixes
+
+- **Fixed crash with CBZ/comic files** (#8, #3): The plugin no longer crashes when opening CBZ or other document types that don't support `getCurrentPage()`. All page-related calls are now safely wrapped with error handling, enabling full tracking support for comic book archives and other formats.
+
+- **Fixed Random Page triggering multiple achievements** (#5): Using the "Random Page" feature (or any large page jump via TOC, bookmarks, etc.) no longer falsely counts hundreds of pages as read. Large jumps (>5 pages) are detected and excluded from page tracking. Additionally, time-based achievements (Early Bird, Night Owl, Weekend Warrior) now only count once per day, and session achievements (Centurion, Marathon, Sprint) only trigger once per session.
+
+- **Fixed streak reset on book finish** (#7): Finishing a book no longer incorrectly resets the reading streak. The streak logic now properly handles midnight crossover sessions (starting a book before midnight and finishing after) and correctly calculates missed days.
+
+- **Fixed ASCII art distortion in landscape mode** (#10): Achievement and tier-up popups now use the dedicated `AsciiPopup` widget with monospace font rendering. The popup automatically detects screen orientation and adjusts its width (60% in landscape vs 85% in portrait) and font size to keep ASCII art properly aligned on all screen orientations.
+
+- **Fixed streak reset on orientation change** (#10): Changing device orientation (portrait ↔ landscape) no longer triggers a session restart. The plugin now detects when `onReaderReady` is called for an already-active session on the same document and skips re-initialization.
+
+#### Improvements
+
+- Added safe page detection for all document types using `pcall` wrappers
+- Achievement notifications now use the `AsciiPopup` widget for better rendering
+- Daily deduplication for time-based achievement progress tracking
+- Session-level deduplication for continuous reading achievements
+- More robust streak continuation logic with freeze token awareness
+- File extension parsing is now nil-safe for documents without extensions
+
+---
+
 ## 📥 Installation
 
 ### Method 1: Direct Download

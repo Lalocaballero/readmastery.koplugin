@@ -286,21 +286,39 @@ end
 function Achievements:checkTimeBasedAchievements()
     local hour = tonumber(os.date("%H"))
     local day_of_week = tonumber(os.date("%w"))
+    local today = os.date("%Y-%m-%d")
     
-    -- Early Bird (4 AM - 7 AM)
-    if hour >= 4 and hour < 7 then
+    -- Initialize daily tracking table if needed
+    if not self._daily_progress then
+        self._daily_progress = {}
+    end
+    if not self._daily_progress[today] then
+        self._daily_progress[today] = {}
+        -- Clean up old dates (keep only today)
+        for date, _ in pairs(self._daily_progress) do
+            if date ~= today then
+                self._daily_progress[date] = nil
+            end
+        end
+    end
+    
+    -- Early Bird (4 AM - 7 AM) — only count once per day
+    if hour >= 4 and hour < 7 and not self._daily_progress[today]["early_bird"] then
+        self._daily_progress[today]["early_bird"] = true
         self:progressAchievement("early_bird")
     end
     
-    -- Night Owl (12 AM - 4 AM)
-    if hour >= 0 and hour < 4 then
+    -- Night Owl (12 AM - 4 AM) — only count once per day
+    if hour >= 0 and hour < 4 and not self._daily_progress[today]["night_owl"] then
+        self._daily_progress[today]["night_owl"] = true
         self:progressAchievement("night_owl")
     end
     
-    -- Weekend Warrior (Saturday or Sunday, 100+ pages)
+    -- Weekend Warrior (Saturday or Sunday, 100+ pages) — only count once per day
     if day_of_week == 0 or day_of_week == 6 then
         local today_pages = self.core:getDailyPages()
-        if today_pages >= 100 then
+        if today_pages >= 100 and not self._daily_progress[today]["weekend_warrior"] then
+            self._daily_progress[today]["weekend_warrior"] = true
             self:progressAchievement("weekend_warrior")
         end
     end
