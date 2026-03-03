@@ -78,6 +78,10 @@ Analytics features unlock as you level up:
 - More robust streak continuation logic with freeze token awareness
 - File extension parsing is now nil-safe for documents without extensions
 
+#### New Features
+
+- **ProjectTitle Footer Support** (#9): ReadMastery stats can now be displayed in the Project: Title plugin's footer bar. Includes a dedicated patch file (`2-projecttitle-footer-readmastery.lua`) and a new "Level + XP" display format (e.g., `Lv11 XP 514/687`). Configure via ReadMastery → Display → ProjectTitle Footer.
+
 ---
 
 ## 📥 Installation
@@ -99,6 +103,24 @@ cd /path/to/koreader/plugins/
 git clone https://github.com/YOUR_USERNAME/ReadMastery.koplugin.git
 ```
 
+### Optional: ProjectTitle Footer Integration
+
+If you use the [Project: Title](https://github.com/joshuacant/ProjectTitle.koplugin) plugin and want ReadMastery stats in the footer:
+
+1. Copy `2-projecttitle-footer-readmastery.lua` from the plugin folder to your KOReader `patches/` directory
+2. Restart KOReader
+3. Configure the display format in **ReadMastery → Display → ProjectTitle Footer**
+
+Available display formats:
+
+| Format | Example |
+|--------|---------|
+| Streak Only | `~5` |
+| Level Only | `Lv3` |
+| Streak + Level | `~5 Lv3` |
+| Level + XP | `Lv11 XP 514/687` |
+| Full | `~5 Lv3 42pg` |
+
 ---
 
 ## 📁 Plugin Structure
@@ -115,6 +137,9 @@ ReadMastery.koplugin/
 ├── featureunlocks.lua     # Level-based feature unlocking
 ├── icons.lua              # ASCII icon definitions
 ├── ascii_art.lua          # Achievement ASCII art
+├── titlebar_integration.lua   # Title bar patch integration
+├── 2-filemanager-titlebar.lua # Title bar patch (copy to patches/)
+├── 2-projecttitle-footer-readmastery.lua  # PT footer patch (copy to patches/)
 └── ui/
     ├── mainmenu.lua       # Main menu interface
     ├── statsview.lua      # Quick stats display

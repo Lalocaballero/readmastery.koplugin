@@ -62,6 +62,9 @@ function ReadMasteryCore:getDefaultData()
         -- Title bar settings
         tb_display_format = "streak_level",
         
+        -- ProjectTitle footer settings
+        pt_display_format = "streak_level",
+        
         -- Timestamps
         created_at = os.time(),
         updated_at = os.time(),

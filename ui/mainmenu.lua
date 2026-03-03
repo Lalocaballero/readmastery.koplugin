@@ -327,6 +327,10 @@ function MainMenu:getDisplayMenu()
             sub_item_table = self:getTitleBarFormatMenu(),
         },
         {
+            text = "ProjectTitle Footer",
+            sub_item_table = self:getProjectTitleFooterMenu(),
+        },
+        {
             text = "Gesture Actions",
             callback = function()
                 self:showGestureInfo()
@@ -395,6 +399,81 @@ function MainMenu:getTitleBarFormatMenu()
                 
                 UIManager:show(InfoMessage:new{
                     text = "Title Bar format: " .. fmt.example .. "\n\nRefresh file browser to see changes.",
+                    timeout = 3,
+                })
+            end,
+            keep_menu_open = true,
+        })
+    end
+    
+    return menu
+end
+
+function MainMenu:getProjectTitleFooterMenu()
+    -- Check if the PT footer patch is installed
+    local lfs = require("libs/libkoreader-lfs")
+    local pt_patch_available = false
+    local patch_paths = {
+        "patches/2-projecttitle-footer-readmastery.lua",
+        "patches/2-pt-footer-readmastery.lua",
+    }
+    for _, path in ipairs(patch_paths) do
+        if lfs.attributes(path, "mode") == "file" then
+            pt_patch_available = true
+            break
+        end
+    end
+    
+    local formats = {
+        { id = "streak_only", name = "Streak Only", example = "~5" },
+        { id = "level_only", name = "Level Only", example = "Lv3" },
+        { id = "streak_level", name = "Streak + Level", example = "~5 Lv3" },
+        { id = "level_xp", name = "Level + XP", example = "Lv11 XP 514/687" },
+        { id = "full", name = "Full", example = "~5 Lv3 42pg" },
+    }
+    
+    local menu = {}
+    
+    if not pt_patch_available then
+        table.insert(menu, {
+            text = "ProjectTitle footer patch not installed",
+            enabled = false,
+        })
+        table.insert(menu, {
+            text = "Copy 2-projecttitle-footer-readmastery.lua",
+            enabled = false,
+        })
+        table.insert(menu, {
+            text = "to your KOReader patches/ folder",
+            enabled = false,
+            separator = true,
+        })
+    else
+        table.insert(menu, {
+            text = "Patch installed ✓",
+            enabled = false,
+            separator = true,
+        })
+    end
+    
+    table.insert(menu, {
+        text = "Display Format:",
+        enabled = false,
+    })
+    
+    for _, fmt in ipairs(formats) do
+        table.insert(menu, {
+            text_func = function()
+                local current = self.plugin.core.data.pt_display_format or "streak_level"
+                local marker = current == fmt.id and " ✓" or ""
+                return fmt.name .. " (" .. fmt.example .. ")" .. marker
+            end,
+            callback = function()
+                self.plugin.core.data.pt_display_format = fmt.id
+                self.plugin.core:save()
+                
+                UIManager:show(InfoMessage:new{
+                    text = "ProjectTitle Footer format: " .. fmt.example .. "\n\nRefresh file browser to see changes.",
                     timeout = 3,
                 })
             end,
@@ -501,7 +580,7 @@ end
 function MainMenu:showAbout()
     local text = [[
 ======= READMASTERY =======
-         v1.2.0
+         v1.3.0
 
 Gamify your reading with:
 
@@ -511,6 +590,7 @@ Gamify your reading with:
 * 11 achievements with 4 tiers
 * Gesture support
 * Title bar integration
+* ProjectTitle footer support
 
 Keep reading, keep growing!
 
