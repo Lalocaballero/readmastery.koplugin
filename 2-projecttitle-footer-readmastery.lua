@@ -74,47 +74,32 @@ local function getReadMasteryText()
     return nil
 end
 
--- Hook into Menu.updatePageInfo to add ReadMastery to footer
+-- Hook into Menu.updatePageInfo to append ReadMastery text AFTER footer renders
 Menu.updatePageInfo = function(self, select_number)
-    -- Build footer config with ReadMastery included
-    -- Check if footer_config already exists (from another patch)
-    if not self.footer_config then
-        self.footer_config = {
-            order = {
-                "clock",
-                "wifi",
-                "battery",
-                "frontlight",
-                "frontlight_warmth",
-            },
-            wifi_show_disabled = true,
-            frontlight_show_off = true,
-        }
-    end
-    
-    -- Add readmastery to the order if not already present
-    local has_readmastery = false
-    if self.footer_config.order then
-        for _, item in ipairs(self.footer_config.order) do
-            if item == "readmastery" then
-                has_readmastery = true
-                break
-            end
-        end
-    end
-    
-    if not has_readmastery then
-        table.insert(self.footer_config.order, "readmastery")
-    end
-    
-    -- Register the readmastery text generator if the footer supports custom items
-    -- This works with ProjectTitle's genItemText pattern
-    if self.genItemText then
-        self.genItemText.readmastery = getReadMasteryText
-    end
-    
-    -- Call original function
+    -- Call original function first (let ProjectTitle render its footer)
     updatePageInfo_orig(self, select_number)
+    
+    -- Now try to append ReadMastery text to the rendered footer
+    local rm_text = getReadMasteryText()
+    if rm_text then
+        pcall(function()
+            -- Try to find and modify the page info text widget
+            -- KOReader's Menu uses page_info_text (TextWidget with .text property)
+            if self.page_info_text and self.page_info_text.text then
+                local current = self.page_info_text.text
+                -- Only append if not already present
+                if not current:find(rm_text, 1, true) then
+                    self.page_info_text:setText(current .. " · " .. rm_text)
+                end
+            -- ProjectTitle may use a different structure - try page_info
+            elseif self.page_info and self.page_info_text then
+                local current = self.page_info_text.text or ""
+                if current ~= "" and not current:find(rm_text, 1, true) then
+                    self.page_info_text:setText(current .. " · " .. rm_text)
+                end
+            end
+        end)
+    end
 end
 
 logger.info("ReadMastery: ProjectTitle footer patch loaded")
