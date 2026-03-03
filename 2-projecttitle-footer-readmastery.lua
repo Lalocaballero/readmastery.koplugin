@@ -115,18 +115,6 @@ Menu.updatePageInfo = function(self, select_number)
     
     -- Call original function
     updatePageInfo_orig(self, select_number)
-    
-    -- If the footer doesn't support genItemText natively,
-    -- try to append ReadMastery text to the footer directly
-    if not self.genItemText and self.page_info_text then
-        local rm_text = getReadMasteryText()
-        if rm_text then
-            local current_text = self.page_info_text:getText()
-            if current_text and not current_text:find(rm_text, 1, true) then
-                self.page_info_text:setText(current_text .. " · " .. rm_text)
-            end
-        end
-    end
 end
 
 logger.info("ReadMastery: ProjectTitle footer patch loaded")
