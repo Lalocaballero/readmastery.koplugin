@@ -4,23 +4,27 @@
     This user patch adds ReadMastery stats (streak, level, XP, pages)
     to the Project: Title plugin's footer bar in the file browser.
     
+    How it works:
+    ProjectTitle's CoverMenu:updatePageInfo() calls _Menu_updatePageInfo_orig()
+    first, then builds the footer text using a local genItemText table and sets
+    it on self.cur_folder_text. This patch wraps Menu.updatePageInfo so that
+    when ProjectTitle calls _Menu_updatePageInfo_orig, our wrapper runs.
+    We then schedule a very short deferred callback that runs AFTER ProjectTitle's
+    updatePageInfo finishes, allowing us to append to cur_folder_text.
+    
     Installation:
     1. Copy this file to your KOReader patches/ directory
     2. Restart KOReader
     3. Configure display format in ReadMastery > Display > ProjectTitle Footer
     
-    Requires: Project: Title plugin (https://github.com/joshuacant/ProjectTitle.koplugin)
+    Requires: Project: Title plugin
     Requires: ReadMastery plugin
 ]]
 
 local DataStorage = require("datastorage")
 local json = require("json")
 local logger = require("logger")
-
-local Menu = require("ui/widget/menu")
-
--- Store original function
-local updatePageInfo_orig = Menu.updatePageInfo
+local UIManager = require("ui/uimanager")
 
 -- ReadMastery data reader for footer
 local function getReadMasteryText()
@@ -43,7 +47,6 @@ local function getReadMasteryText()
                 elseif format == "streak_level" then
                     return "~" .. streak .. " Lv" .. level
                 elseif format == "level_xp" then
-                    -- Calculate XP for current level
                     local xp = data.xp or 0
                     local function getXPRequiredForLevel(lvl)
                         local total = 0
@@ -74,30 +77,36 @@ local function getReadMasteryText()
     return nil
 end
 
--- Hook into Menu.updatePageInfo to append ReadMastery text AFTER footer renders
+-- We need to hook AFTER ProjectTitle's CoverMenu:updatePageInfo runs.
+-- PT's flow: CoverMenu:updatePageInfo -> _Menu_updatePageInfo_orig (our hook) -> PT continues
+-- Strategy: In our Menu.updatePageInfo hook, we store a reference to `self`,
+-- then schedule a zero-delay callback that appends to cur_folder_text after PT finishes.
+
+local Menu = require("ui/widget/menu")
+local updatePageInfo_orig = Menu.updatePageInfo
+
 Menu.updatePageInfo = function(self, select_number)
-    -- Call original function first (let ProjectTitle render its footer)
+    -- Call original
     updatePageInfo_orig(self, select_number)
     
-    -- Now try to append ReadMastery text to the rendered footer
-    local rm_text = getReadMasteryText()
-    if rm_text then
-        pcall(function()
-            -- Try to find and modify the page info text widget
-            -- KOReader's Menu uses page_info_text (TextWidget with .text property)
-            if self.page_info_text and self.page_info_text.text then
-                local current = self.page_info_text.text
-                -- Only append if not already present
-                if not current:find(rm_text, 1, true) then
-                    self.page_info_text:setText(current .. " · " .. rm_text)
+    -- Schedule a deferred append to run after the calling function (PT's updatePageInfo) finishes
+    -- Use nextTick to ensure it runs after the current call stack completes
+    if self.cur_folder_text then
+        UIManager:nextTick(function()
+            pcall(function()
+                local rm_text = getReadMasteryText()
+                if rm_text and self.cur_folder_text then
+                    local current = self.cur_folder_text.text or ""
+                    if current ~= "" then
+                        -- Only append if not already present
+                        if not current:find(rm_text, 1, true) then
+                            self.cur_folder_text:setText(current .. " · " .. rm_text)
+                        end
+                    else
+                        self.cur_folder_text:setText(rm_text)
+                    end
                 end
-            -- ProjectTitle may use a different structure - try page_info
-            elseif self.page_info and self.page_info_text then
-                local current = self.page_info_text.text or ""
-                if current ~= "" and not current:find(rm_text, 1, true) then
-                    self.page_info_text:setText(current .. " · " .. rm_text)
-                end
-            end
+            end)
         end)
     end
 end
