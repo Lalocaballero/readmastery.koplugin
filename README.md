@@ -5,6 +5,7 @@
 ![KOReader](https://img.shields.io/badge/KOReader-Plugin-blue)
 ![Lua](https://img.shields.io/badge/Language-Lua-purple)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=flat&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/lalocaballero)
 
 ---
 
