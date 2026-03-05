@@ -5,12 +5,10 @@
     to the Project: Title plugin's footer bar in the file browser.
     
     How it works:
-    ProjectTitle's CoverMenu:updatePageInfo() calls _Menu_updatePageInfo_orig()
-    first, then builds the footer text using a local genItemText table and sets
-    it on self.cur_folder_text. This patch wraps Menu.updatePageInfo so that
-    when ProjectTitle calls _Menu_updatePageInfo_orig, our wrapper runs.
-    We then schedule a deferred callback that runs AFTER ProjectTitle's
-    updatePageInfo finishes, allowing us to append to cur_folder_text.
+    We hook Menu.updatePageInfo. On the first call where we detect that
+    CoverMenu has overridden updatePageInfo (meaning ProjectTitle is active),
+    we wrap CoverMenu's version so our code runs AFTER PT finishes setting
+    cur_folder_text. This ensures ReadMastery text persists across pagination.
     
     Installation:
     1. Copy this file to your KOReader patches/ directory
@@ -24,7 +22,6 @@
 local DataStorage = require("datastorage")
 local json = require("json")
 local logger = require("logger")
-local UIManager = require("ui/uimanager")
 
 -- ReadMastery data reader for footer
 local function getReadMasteryText()
@@ -77,45 +74,65 @@ local function getReadMasteryText()
     return nil
 end
 
--- Helper function to append ReadMastery text to cur_folder_text
-local function appendReadMasteryToFooter(menu_self)
+-- Helper to append ReadMastery text to cur_folder_text
+local function appendToFooter(self)
     pcall(function()
-        local rm_text = getReadMasteryText()
-        if rm_text and menu_self.cur_folder_text then
-            local current = menu_self.cur_folder_text.text or ""
-            if current ~= "" then
-                -- Only append if not already present
-                if not current:find(rm_text, 1, true) then
-                    menu_self.cur_folder_text:setText(current .. " · " .. rm_text)
+        if self.cur_folder_text then
+            local rm_text = getReadMasteryText()
+            if rm_text then
+                local current = self.cur_folder_text.text or ""
+                if current ~= "" then
+                    if not current:find(rm_text, 1, true) then
+                        self.cur_folder_text:setText(current .. " · " .. rm_text)
+                    end
+                else
+                    self.cur_folder_text:setText(rm_text)
                 end
-            else
-                menu_self.cur_folder_text:setText(rm_text)
             end
         end
     end)
 end
 
--- We need to hook AFTER ProjectTitle's CoverMenu:updatePageInfo runs.
--- PT's flow: CoverMenu:updatePageInfo -> _Menu_updatePageInfo_orig (our hook) -> PT continues
--- Strategy: Schedule the append using tickAfterNext to ensure it runs after PT's
--- entire updatePageInfo call stack AND any immediate UI updates complete.
--- This is more reliable than nextTick which can fire before PT finishes in some cases
--- (e.g., during pagination where updateItems triggers multiple updatePageInfo calls).
+-- Strategy: Hook Menu.updatePageInfo. When PT's CoverMenu overrides updatePageInfo,
+-- it stores the original as _Menu_updatePageInfo_orig and calls it inside its own
+-- CoverMenu:updatePageInfo. We can't hook CoverMenu directly at patch load time
+-- (it doesn't exist yet). Instead, we use a lazy approach:
+--
+-- On each call to our hooked Menu.updatePageInfo, we check if the calling object's
+-- class has its own updatePageInfo (i.e., CoverMenu). If so, we wrap THAT method
+-- once, so our append code runs AFTER CoverMenu:updatePageInfo completes.
 
 local Menu = require("ui/widget/menu")
 local updatePageInfo_orig = Menu.updatePageInfo
+local _covermenu_hooked = false
 
 Menu.updatePageInfo = function(self, select_number)
-    -- Call original
+    -- Call the real original Menu.updatePageInfo
     updatePageInfo_orig(self, select_number)
     
-    -- Schedule append after PT finishes - use tickAfterNext for reliable timing
-    -- tickAfterNext waits 2 event loop iterations, ensuring PT's updatePageInfo
-    -- and any chained UI updates have fully completed
-    if self.cur_folder_text then
-        UIManager:tickAfterNext(function()
-            appendReadMasteryToFooter(self)
-        end)
+    -- Lazy-hook CoverMenu's updatePageInfo if not already done
+    -- We detect CoverMenu by checking if the object's metatable has its own
+    -- updatePageInfo that differs from Menu.updatePageInfo
+    if not _covermenu_hooked then
+        local mt = getmetatable(self)
+        if mt and mt.__index then
+            local class = mt.__index
+            -- Check if this class has its own updatePageInfo (CoverMenu does)
+            if rawget(class, "updatePageInfo") and rawget(class, "updatePageInfo") ~= Menu.updatePageInfo then
+                local covermenu_updatePageInfo_orig = rawget(class, "updatePageInfo")
+                -- Wrap CoverMenu's updatePageInfo
+                class.updatePageInfo = function(cm_self, cm_select_number)
+                    -- Call CoverMenu's original updatePageInfo (which calls _Menu_updatePageInfo_orig internally)
+                    covermenu_updatePageInfo_orig(cm_self, cm_select_number)
+                    -- NOW we run AFTER PT has finished setting cur_folder_text
+                    appendToFooter(cm_self)
+                end
+                _covermenu_hooked = true
+                -- Also append for this first call since we just hooked
+                appendToFooter(self)
+                logger.info("ReadMastery: Hooked CoverMenu.updatePageInfo for footer integration")
+            end
+        end
     end
 end
 
