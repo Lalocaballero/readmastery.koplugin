@@ -410,19 +410,8 @@ function MainMenu:getTitleBarFormatMenu()
 end
 
 function MainMenu:getProjectTitleFooterMenu()
-    -- Check if the PT footer patch is installed
-    local lfs = require("libs/libkoreader-lfs")
-    local pt_patch_available = false
-    local patch_paths = {
-        "patches/2-projecttitle-footer-readmastery.lua",
-        "patches/2-pt-footer-readmastery.lua",
-    }
-    for _, path in ipairs(patch_paths) do
-        if lfs.attributes(path, "mode") == "file" then
-            pt_patch_available = true
-            break
-        end
-    end
+    local TitleBarIntegration = require("titlebar_integration")
+    local pt_active = TitleBarIntegration.pt_footer_hooked
     
     local formats = {
         { id = "streak_only", name = "Streak Only", example = "~5" },
@@ -434,23 +423,19 @@ function MainMenu:getProjectTitleFooterMenu()
     
     local menu = {}
     
-    if not pt_patch_available then
+    if pt_active then
         table.insert(menu, {
-            text = "ProjectTitle footer patch not installed",
-            enabled = false,
-        })
-        table.insert(menu, {
-            text = "Copy 2-projecttitle-footer-readmastery.lua",
-            enabled = false,
-        })
-        table.insert(menu, {
-            text = "to your KOReader patches/ folder",
+            text = "ProjectTitle footer active ✓",
             enabled = false,
             separator = true,
         })
     else
         table.insert(menu, {
-            text = "Patch installed ✓",
+            text = "ProjectTitle not detected",
+            enabled = false,
+        })
+        table.insert(menu, {
+            text = "Install ProjectTitle plugin to enable",
             enabled = false,
             separator = true,
         })
@@ -473,7 +458,7 @@ function MainMenu:getProjectTitleFooterMenu()
                 self.plugin.core:save()
                 
                 UIManager:show(InfoMessage:new{
-                    text = "ProjectTitle Footer format: " .. fmt.example .. "\n\nRefresh file browser to see changes.",
+                    text = "ProjectTitle Footer format: " .. fmt.example .. "\n\nReturn to file browser to see changes.",
                     timeout = 3,
                 })
             end,

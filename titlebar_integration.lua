@@ -105,6 +105,59 @@ function TitleBarIntegration:getFreezeTokens()
     return self.core:getFreezeTokens() or 0
 end
 
+-- ProjectTitle Footer Integration
+-- This hooks Menu.updatePageInfo AFTER ProjectTitle has replaced it
+-- with CoverMenu.updatePageInfo. Since plugins load after PT,
+-- Menu.updatePageInfo is already CoverMenu's version at this point.
+-- We wrap it so our code runs AFTER PT sets cur_folder_text.
+TitleBarIntegration.pt_footer_hooked = false
+
+function TitleBarIntegration:initPTFooter(core)
+    if self.pt_footer_hooked then return true end
+    
+    self.core = core
+    
+    local Menu = require("ui/widget/menu")
+    local current_updatePageInfo = Menu.updatePageInfo
+    
+    if not current_updatePageInfo then
+        logger.dbg("ReadMastery: Menu.updatePageInfo not found, skipping PT footer")
+        return false
+    end
+    
+    local integration = self
+    
+    -- Wrap the current Menu.updatePageInfo (which is CoverMenu.updatePageInfo after PT loads)
+    Menu.updatePageInfo = function(menu_self, select_number)
+        -- Call PT's CoverMenu.updatePageInfo (or original if PT not installed)
+        current_updatePageInfo(menu_self, select_number)
+        
+        -- After PT finishes, append ReadMastery text to cur_folder_text
+        if menu_self.cur_folder_text and integration.core then
+            pcall(function()
+                local format = integration.core.data.pt_display_format 
+                    or integration.core.data.tb_display_format 
+                    or "streak_level"
+                local rm_text = integration:formatText(format)
+                if rm_text and rm_text ~= "" then
+                    local current = menu_self.cur_folder_text.text or ""
+                    if current ~= "" then
+                        if not current:find(rm_text, 1, true) then
+                            menu_self.cur_folder_text:setText(current .. " · " .. rm_text)
+                        end
+                    else
+                        menu_self.cur_folder_text:setText(rm_text)
+                    end
+                end
+            end)
+        end
+    end
+    
+    self.pt_footer_hooked = true
+    logger.info("ReadMastery: ProjectTitle footer integration successful")
+    return true
+end
+
 -- Cleanup
 function TitleBarIntegration:cleanup()
     self.initialized = false
