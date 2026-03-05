@@ -94,13 +94,11 @@ function ReadMastery:initIntegrations()
         self.tb_integrated = TitleBarIntegration:init(self.core)
     end
     
-    -- ProjectTitle Footer integration
-    -- This must run AFTER PT has loaded and replaced Menu.updatePageInfo
-    -- with CoverMenu.updatePageInfo. Since plugins load after patches,
-    -- by the time init() runs, PT's replacement is already in place.
-    self.pt_integrated = TitleBarIntegration:initPTFooter(self.core)
+    -- ProjectTitle Footer integration is handled via a modified covermenu.lua
+    -- that users install by replacing PT's covermenu.lua with our version.
+    -- See: covermenu_readmastery.lua in the plugin folder.
     
-    logger.dbg("ReadMastery: Integrations initialized. PT:", self.pt_integrated, "TB:", self.tb_integrated)
+    logger.dbg("ReadMastery: Integrations initialized. TB:", self.tb_integrated)
 end
 
 -- Register actions for gesture system
