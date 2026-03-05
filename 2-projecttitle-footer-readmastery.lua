@@ -16,8 +16,9 @@
 local DataStorage = require("datastorage")
 local json = require("json")
 local logger = require("logger")
+local UIManager = require("ui/uimanager")
 
--- ReadMastery data reader for footer
+-- Cache for ReadMastery data (refreshed on each call)
 local function getReadMasteryText()
     local ok, result = pcall(function()
         local data_file = DataStorage:getDataDir() .. "/readmastery/readmastery_data.json"
@@ -68,77 +69,76 @@ local function getReadMasteryText()
     return nil
 end
 
--- Helper to append ReadMastery text to cur_folder_text
-local function appendToFooter(menu_instance)
-    pcall(function()
-        if menu_instance and menu_instance.cur_folder_text then
-            local rm_text = getReadMasteryText()
-            if rm_text then
-                local current = menu_instance.cur_folder_text.text or ""
-                if current ~= "" then
-                    if not current:find(rm_text, 1, true) then
-                        menu_instance.cur_folder_text:setText(current .. " · " .. rm_text)
-                    end
-                else
-                    menu_instance.cur_folder_text:setText(rm_text)
-                end
-            end
-        end
-    end)
-end
-
--- Hook strategy:
--- We wrap Menu.updatePageInfo. PT stores this as _Menu_updatePageInfo_orig.
--- When PT's CoverMenu:updatePageInfo calls _Menu_updatePageInfo_orig, our code runs.
--- We save a reference to the menu instance.
--- Then we ALSO hook FileManager events that trigger after updatePageInfo completes.
-
 local Menu = require("ui/widget/menu")
 local updatePageInfo_orig = Menu.updatePageInfo
 
--- Keep track of the last CoverMenu instance we saw
-local _last_menu_instance = nil
-
 Menu.updatePageInfo = function(self, select_number)
-    -- Call the real original
+    -- Call original (PT stores this as _Menu_updatePageInfo_orig)
     updatePageInfo_orig(self, select_number)
     
-    -- Remember this instance if it has cur_folder_text (meaning it's PT's CoverMenu)
+    -- If this menu has cur_folder_text, it's ProjectTitle's CoverMenu
+    -- Schedule append on next tick AND tick after next to cover both
+    -- initial render and pagination scenarios
     if self.cur_folder_text then
-        _last_menu_instance = self
-    end
-end
-
--- Hook FileManager events that fire after the menu is fully rendered.
--- FileManager:onPathChanged fires on folder navigation.
--- We also hook FileManager:onResume and the initial onPathChanged.
-local FileManager = require("apps/filemanager/filemanager")
-
-local orig_onPathChanged = FileManager.onPathChanged
-if orig_onPathChanged then
-    FileManager.onPathChanged = function(self, path)
-        local result = orig_onPathChanged(self, path)
-        -- After path change, append to footer
-        if _last_menu_instance then
-            appendToFooter(_last_menu_instance)
-        end
-        return result
-    end
-end
-
--- Also hook the file_chooser's onFileSelect and page navigation
--- by wrapping FileChooser:refreshPath which is called on every pagination
-local FileChooser = require("ui/widget/filechooser")
-local orig_refreshPath = FileChooser.refreshPath
-
-if orig_refreshPath then
-    FileChooser.refreshPath = function(self, ...)
-        local result = orig_refreshPath(self, ...)
-        -- After refresh (pagination, folder change), append to footer
-        if _last_menu_instance then
-            appendToFooter(_last_menu_instance)
-        end
-        return result
+        local menu_ref = self
+        
+        -- First attempt: nextTick (works for initial load, folder navigation)
+        UIManager:nextTick(function()
+            pcall(function()
+                local rm_text = getReadMasteryText()
+                if rm_text and menu_ref.cur_folder_text then
+                    local current = menu_ref.cur_folder_text.text or ""
+                    if current ~= "" then
+                        if not current:find(rm_text, 1, true) then
+                            menu_ref.cur_folder_text:setText(current .. " · " .. rm_text)
+                            -- Force screen refresh so the change is visible
+                            UIManager:setDirty(menu_ref, "ui")
+                        end
+                    else
+                        menu_ref.cur_folder_text:setText(rm_text)
+                        UIManager:setDirty(menu_ref, "ui")
+                    end
+                end
+            end)
+        end)
+        
+        -- Second attempt: tickAfterNext (backup for pagination where nextTick is too early)
+        UIManager:tickAfterNext(function()
+            pcall(function()
+                local rm_text = getReadMasteryText()
+                if rm_text and menu_ref.cur_folder_text then
+                    local current = menu_ref.cur_folder_text.text or ""
+                    if current ~= "" then
+                        if not current:find(rm_text, 1, true) then
+                            menu_ref.cur_folder_text:setText(current .. " · " .. rm_text)
+                            UIManager:setDirty(menu_ref, "ui")
+                        end
+                    else
+                        menu_ref.cur_folder_text:setText(rm_text)
+                        UIManager:setDirty(menu_ref, "ui")
+                    end
+                end
+            end)
+        end)
+        
+        -- Third attempt: short scheduled delay as final fallback
+        UIManager:scheduleIn(0.1, function()
+            pcall(function()
+                local rm_text = getReadMasteryText()
+                if rm_text and menu_ref.cur_folder_text then
+                    local current = menu_ref.cur_folder_text.text or ""
+                    if current ~= "" then
+                        if not current:find(rm_text, 1, true) then
+                            menu_ref.cur_folder_text:setText(current .. " · " .. rm_text)
+                            UIManager:setDirty(menu_ref, "ui")
+                        end
+                    else
+                        menu_ref.cur_folder_text:setText(rm_text)
+                        UIManager:setDirty(menu_ref, "ui")
+                    end
+                end
+            end)
+        end)
     end
 end
 
