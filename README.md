@@ -81,7 +81,7 @@ Analytics features unlock as you level up:
 
 #### New Features
 
-- **ProjectTitle Footer Support** (#9): ReadMastery stats can now be displayed in the Project: Title plugin's footer bar. Includes a dedicated patch file (`2-projecttitle-footer-readmastery.lua`) and a new "Level + XP" display format (e.g., `Lv11 XP 514/687`). Configure via ReadMastery → Display → ProjectTitle Footer.
+- **ProjectTitle Footer Support** (#9): ReadMastery stats can now be displayed in the Project: Title plugin's footer bar. Ships with a modified `covermenu_readmastery.lua` that replaces PT's original `covermenu.lua`. Includes a new "Level + XP" display format (e.g., `Lv11 XP 514/687`). Configure via ReadMastery → Display → ProjectTitle Footer.
 
 ---
 
@@ -108,9 +108,17 @@ git clone https://github.com/YOUR_USERNAME/ReadMastery.koplugin.git
 
 If you use the [Project: Title](https://github.com/joshuacant/ProjectTitle.koplugin) plugin and want ReadMastery stats in the footer:
 
-1. Copy `2-projecttitle-footer-readmastery.lua` from the plugin folder to your KOReader `patches/` directory
-2. Restart KOReader
-3. Configure the display format in **ReadMastery → Display → ProjectTitle Footer**
+1. Find `covermenu_readmastery.lua` inside the ReadMastery plugin folder
+2. Copy it to your ProjectTitle plugin directory:
+   - **Kindle**: `/koreader/plugins/projecttitle.koplugin/`
+   - **Kobo**: `/.adds/koreader/plugins/projecttitle.koplugin/`
+   - **Android**: `/sdcard/koreader/plugins/projecttitle.koplugin/`
+3. **Rename** `covermenu_readmastery.lua` to `covermenu.lua` (replacing ProjectTitle's original file)
+4. Restart KOReader
+
+> **Note:** This replaces ProjectTitle's `covermenu.lua` with a version that includes ReadMastery support. If you update ProjectTitle in the future, you may need to repeat this step. We recommend keeping a backup of the original `covermenu.lua`.
+
+5. Configure the display format in **ReadMastery → Display → ProjectTitle Footer**
 
 Available display formats:
 
@@ -121,6 +129,8 @@ Available display formats:
 | Streak + Level | `~5 Lv3` |
 | Level + XP | `Lv11 XP 514/687` |
 | Full | `~5 Lv3 42pg` |
+
+> **Tip:** If you also use the [footer widgets patch](https://github.com/joshuacant/KOReader.patches/blob/main/2-reader-footer-widgets.lua), you can add `"readmastery"` to its `order` table to control where ReadMastery appears in the footer.
 
 ---
 
@@ -140,7 +150,7 @@ ReadMastery.koplugin/
 ├── ascii_art.lua          # Achievement ASCII art
 ├── titlebar_integration.lua   # Title bar patch integration
 ├── 2-filemanager-titlebar.lua # Title bar patch (copy to patches/)
-├── 2-projecttitle-footer-readmastery.lua  # PT footer patch (copy to patches/)
+├── covermenu_readmastery.lua  # Modified PT covermenu (replace PT's covermenu.lua)
 └── ui/
     ├── mainmenu.lua       # Main menu interface
     ├── statsview.lua      # Quick stats display
